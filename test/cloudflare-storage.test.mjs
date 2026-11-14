@@ -28,19 +28,26 @@ function storageFixture() {
   };
 }
 
-test('hosted storage reconstructs Unicode payloads and erases expired source chunks', t => {
+test('hosted storage reconstructs Unicode payloads and erases expired source and nested job chunks', t => {
   const storage = storageFixture(); t.after(() => storage.close());
   const store = workspaceStore(storage), session = store.newSession();
   const metadata = {id: 'synthetic-chat', title: 'Synthetic', participants: ['A', 'B']};
   const messages = [{sender: 'A', text: '🙂'.repeat(160000), timestamp: null}, {sender: 'B', text: 'Reply', timestamp: null}];
   store.addConversation(session, metadata, messages);
   assert.deepEqual(store.conversation(session, metadata.id).messages, messages);
+  const job = {id: 'job', requestId: 'request', status: 'planning', conversationIds: [metadata.id], plan: {source: '中🙂'.repeat(150000)}, memo: 'Synthetic ledger '.repeat(10000)};
+  store.addJob(session, job);
+  assert.deepEqual(store.job(session, job.id), job);
+  store.updateJob(session, job.id, current => ({...current, status: 'running'}));
+  collectPayloads(storage);
+  assert.equal(store.job(session, job.id).plan.source, job.plan.source);
   const report = {id: 'report', sections: [{title: 'Saved report', body: 'A completed summary.'}]};
   store.addReport(session, report, [metadata.id]);
   assert.ok(storage.sql.exec('SELECT id FROM payload_chunks').toArray().length);
   store.purge('2100-01-01T00:00:00.000Z');
   collectPayloads(storage);
   assert.equal(store.conversation(session, metadata.id).messages, null);
+  assert.equal(store.job(session, job.id), null);
   assert.deepEqual(store.report(session, report.id), report);
   assert.equal(storage.sql.exec('SELECT id FROM payload_chunks').toArray().length, 0, 'Expired source must not survive in chunk storage');
 });

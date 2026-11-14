@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 // @ts-ignore OpenNext generates this module during build:cloudflare.
 import next from "../.open-next/worker.js";
 import { createApi } from "../lib/api";
+import { reportJobs } from "../lib/report-jobs";
 import { workspaceStore, collectPayloads } from "./storage";
 
 interface Env {
@@ -13,12 +14,17 @@ const sessionPattern = /(?:^|;\s*)raju_session=([a-f0-9-]{36})(?:;|$)/;
 
 export class Workspace extends DurableObject<Env> {
   private store;
+  private jobs;
   private handle;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.store = workspaceStore(ctx.storage);
-    this.handle = createApi({ store: this.store, origin: env.APP_ORIGIN });
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS pending_jobs(session TEXT NOT NULL,id TEXT PRIMARY KEY)");
+    this.jobs = reportJobs(this.store, (session, id) => {
+      ctx.storage.sql.exec("INSERT OR IGNORE INTO pending_jobs VALUES (?,?)", session, id);
+    });
+    this.handle = createApi({ store: this.store, origin: env.APP_ORIGIN, jobs: this.jobs });
   }
 
   async fetch(request: Request) {
@@ -32,13 +38,20 @@ export class Workspace extends DurableObject<Env> {
   }
 
   private async schedule() {
+    const pending = this.ctx.storage.sql.exec("SELECT id FROM pending_jobs LIMIT 1").toArray().length;
     const expires = this.ctx.storage.sql.exec<{ expires: string | null }>("SELECT MIN(expires_at) AS expires FROM conversations WHERE messages IS NOT NULL").one().expires;
-    if (expires) await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Date.parse(expires)));
+    if (pending || expires) await this.ctx.storage.setAlarm(pending ? Date.now() + 100 : Math.max(Date.now() + 100, Date.parse(expires!)));
     else await this.ctx.storage.deleteAlarm();
   }
 
   async alarm() {
     this.store.purge();
+    const pending = this.ctx.storage.sql.exec<{ session: string; id: string }>("SELECT session,id FROM pending_jobs LIMIT 1").toArray()[0];
+    if (pending) {
+      // Claiming and provider accounting are persisted before a call. Alarm retries never resume a claimed paid call.
+      if (this.store.job(pending.session, pending.id)) await this.jobs.run(pending.session, pending.id);
+      this.ctx.storage.sql.exec("DELETE FROM pending_jobs WHERE id=?", pending.id);
+    }
     collectPayloads(this.ctx.storage);
     await this.schedule();
   }

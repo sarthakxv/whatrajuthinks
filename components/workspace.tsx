@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, formatDate, num, useApi } from "@/lib/client";
-import type { Conversation, ReportSummary } from "@/lib/types";
+import type { Conversation, ReportJobView, ReportSummary } from "@/lib/types";
 import { BackButton, Icon, LoadingView, Modal, PageError, ErrorMessage } from "./ui";
 
 const cardColors = ["#fec901", "#ff91e7", "#7ee1b5", "#c3b6fc"];
@@ -29,10 +29,15 @@ function countLabel(count: number) {
 }
 
 export function Workspace() {
-  const reports = useApi<{ reports: ReportSummary[] }>("/api/reports");
-  const chats = useApi<{ conversations: Conversation[] }>("/api/conversations");
-  if (reports.error || chats.error)
-    return <PageError message={reports.error || chats.error || ""} />;
+  const pending = useApi<{ jobs: ReportJobView[] }>("/api/report-jobs", 5000);
+  const reports = useApi<{ reports: ReportSummary[] }>("/api/reports", 0, true);
+  const chats = useApi<{ conversations: Conversation[] }>("/api/conversations", 0, true);
+  if ((reports.error || chats.error) && (!reports.data || !chats.data))
+    return <main className="narrow prose" id="main">
+      <h1>Your account</h1>
+      <ErrorMessage message="Your reports couldn’t be loaded. Please try again." />
+      <button className="btn btn-primary" onClick={() => { void reports.refresh(); void chats.refresh(); }}>Try again</button>
+    </main>;
   if (!reports.data || !chats.data)
     return <LoadingView label="Opening your conversations." />;
   const reportList = reports.data.reports;
@@ -75,6 +80,11 @@ export function Workspace() {
           <Icon name="gear" />
         </Link>
       </header>
+      {pending.data?.jobs.filter(job => job.status !== "completed").map(job => (
+        <div className="notice" key={job.id}>
+          <Link href={`/generating/${job.id}`}>{job.stage} · Open your reading</Link>
+        </div>
+      ))}
       <div className="convo-grid">
         {cards.map((card, index) => (
           <Link

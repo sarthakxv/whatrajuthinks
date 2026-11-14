@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { parseChat, computeStats, decodeImport } from "./parser.mjs";
 import type { Store } from "./store.mjs";
-import { aiConfigured, createReport } from "./reports.ts";
+import { aiConfiguration, aiConfigured, createReport } from "./reports.ts";
+import { isLargeChat, isLargeHistory } from "./chat-size.ts";
+import { AnalysisError } from "./ai-analysis.ts";
+import { reportJobs } from "./report-jobs.ts";
 import type {
   Conversation,
   Report,
@@ -41,6 +44,7 @@ function cleanConversation(conversation: StoredConversation): Conversation {
     ...metadata,
     available: Array.isArray(messages),
     ...(messages ? { stats: computeStats(messages) } : {}),
+    ...(messages ? { isLargeChat: isLargeChat({ ...metadata, messages }) } : {}),
   };
 }
 
@@ -119,10 +123,12 @@ export function createApi({
   store,
   busy = new Set<string>(),
   origin,
+  jobs = reportJobs(store),
 }: {
   store: Store;
   busy?: Set<string>;
   origin?: string;
+  jobs?: ReturnType<typeof reportJobs>;
 }): (request: Request) => Promise<Response> {
   return async function handle(request: Request): Promise<Response> {
     const headers = new Headers({
@@ -171,6 +177,14 @@ export function createApi({
           emailEnabled: false,
         });
       }
+      if (path === "/api/report-jobs" && request.method === "GET")
+        return json(200, { jobs: store.jobs(sessionId).map(job => jobs.get(sessionId, job.id)) });
+      const jobMatch = path.match(/^\/api\/report-jobs\/([a-f0-9-]{36})(?:\/(confirm|resume))?$/);
+      if (jobMatch) {
+        if (request.method === "GET" && !jobMatch[2]) return json(200, { job: jobs.get(sessionId, jobMatch[1]) });
+        if (request.method === "POST" && jobMatch[2]) return json(200, { job: jobs.act(sessionId, jobMatch[1], jobMatch[2] as "confirm" | "resume") });
+        fail(405, "Method not allowed.");
+      }
       if (path === "/api/import" && request.method === "POST") {
         const input = await body(request);
         const filename = requiredString(input.filename, "Filename", 250);
@@ -209,6 +223,7 @@ export function createApi({
           context: optionalString(input.context, "Chat type", 100) || "Other",
           createdAt: new Date().toISOString(),
         };
+        metadata.isLargeChat = isLargeChat({ ...metadata, messages: parsed.messages });
         const conversation = store.addConversation(
           sessionId,
           metadata,
@@ -220,7 +235,11 @@ export function createApi({
         });
       }
       if (path === "/api/conversations" && request.method === "GET")
-        return json(200, { conversations: store.conversations(sessionId) });
+        return json(200, { conversations: store.conversations(sessionId).map(metadata => {
+          if (metadata.isLargeChat !== undefined || !metadata.available) return metadata;
+          const source = store.conversation(sessionId, metadata.id);
+          return source?.messages ? { ...metadata, isLargeChat: isLargeChat({ ...source, messages: source.messages }) } : metadata;
+        }) });
       const chatMatch = path.match(/^\/api\/conversations\/([a-f0-9-]{36})$/);
       if (chatMatch) {
         const conversation = store.conversation(sessionId, chatMatch[1]);
@@ -228,10 +247,12 @@ export function createApi({
         if (request.method === "GET")
           return json(200, { conversation: cleanConversation(conversation) });
         if (request.method === "DELETE") {
+          if (jobs.active(sessionId)) fail(409, "Wait for the current reading to stop before deleting source chats.");
           store.deleteConversation(sessionId, conversation.id);
           return json(200, { deleted: true, reportsPreserved: true });
         }
         if (request.method === "PATCH") {
+          if (jobs.active(sessionId)) fail(409, "Wait for the current reading to stop before changing source chats.");
           const input = await body(request);
           const metadata = cleanConversation(conversation);
           delete metadata.stats;
@@ -274,6 +295,7 @@ export function createApi({
             !metadata.participants.includes(metadata.person)
           )
             delete metadata.person;
+          if (messages) metadata.isLargeChat = isLargeChat({ ...metadata, messages });
           store.updateConversation(
             sessionId,
             conversation.id,
@@ -309,23 +331,22 @@ export function createApi({
         fail(405, "Method not allowed.");
       }
       if (
-        (path === "/api/reports" || path === "/api/ultimate") &&
+        (path === "/api/reports" || path === "/api/ultimate" || path === "/api/report-jobs") &&
         request.method === "POST"
       ) {
         if (busy.has(sessionId))
           fail(409, "A report is already being generated. Please wait.");
         const input = await body(request);
         const candidateIds =
-          path === "/api/ultimate"
-            ? input.conversationIds
-            : [input.conversationId];
+          path === "/api/ultimate" || (path === "/api/report-jobs" && input.conversationIds !== undefined)
+            ? input.conversationIds : [input.conversationId];
         if (
           !Array.isArray(candidateIds) ||
           candidateIds.some((id) => typeof id !== "string") ||
           new Set(candidateIds).size !== candidateIds.length ||
           (path === "/api/ultimate"
             ? candidateIds.length < 2 || candidateIds.length > 5
-            : candidateIds.length !== 1)
+            : path === "/api/report-jobs" ? candidateIds.length < 1 || candidateIds.length > 5 : candidateIds.length !== 1)
         ) {
           fail(400, "Select the required number of unique conversations.");
         }
@@ -345,6 +366,13 @@ export function createApi({
             conversations.flatMap((conversation) => conversation.participants),
           ),
         ]);
+        if (path === "/api/report-jobs" && options.mode !== "ai") fail(400, "Report jobs are for AI readings. Use local analysis for a factual report.");
+        if (options.mode === "ai" && aiConfiguration().provider === "anthropic") {
+          const requestId = input.requestId === undefined ? randomUUID() : requiredString(input.requestId, "Request identifier", 100);
+          return json(202, { job: jobs.create(sessionId, conversations, options, requestId) });
+        }
+        if (jobs.active(sessionId)) fail(409, "A report is already being prepared. Wait for it to finish.");
+        if (options.mode === "ai" && isLargeHistory(conversations)) fail(409, "Large-chat AI confirmation currently requires the Anthropic pipeline. Choose local analysis or configure Anthropic.");
         busy.add(sessionId);
         try {
           let report: Report;
@@ -379,7 +407,7 @@ export function createApi({
         return json(200, { signedOut: true });
       }
       if (path === "/api/account" && request.method === "DELETE") {
-        if (busy.has(sessionId))
+        if (busy.has(sessionId) || jobs.active(sessionId))
           fail(
             409,
             "Wait for report generation to finish before deleting local data.",
@@ -393,9 +421,9 @@ export function createApi({
       }
       fail(404, "API route not found.");
     } catch (error) {
-      return json(error instanceof ApiError ? error.status : 500, {
+      return json(error instanceof ApiError || error instanceof AnalysisError ? error.status : 500, {
         error:
-          error instanceof ApiError
+          error instanceof ApiError || error instanceof AnalysisError
             ? error.message
             : "Something went wrong on the local server.",
       });

@@ -56,6 +56,51 @@ export interface Conversation {
   expiresAt?: string;
   available?: boolean;
   stats?: Stats;
+  isLargeChat?: boolean;
+}
+
+export type SourceConversation = Pick<Conversation, "id" | "title" | "participants"> & {
+  context?: string;
+  messages: Message[];
+};
+
+export interface Consumption {
+  id: string;
+  model: string;
+  stage: "extract" | "reduce" | "write";
+  status: "reserved" | "completed" | "uncertain" | "rejected";
+  estimatedCostUsd: number;
+  costUsd?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  pricingVersion: string;
+}
+
+export interface AnalysisUsage {
+  method: "direct" | "chunked" | "recent";
+  processedMessages: number;
+  evidenceMessages: number;
+  estimatedCostUsd: number;
+  budgetUsd: number;
+  calls: Consumption[];
+}
+
+export interface ReportJobView {
+  id: string;
+  status: "planning" | "awaiting_confirmation" | "queued" | "running" | "interrupted" | "failed" | "completed";
+  stage: string;
+  completedChunks: number;
+  totalChunks: number;
+  estimatedCostUsd?: number;
+  budgetUsd: number;
+  consumedCostUsd: number;
+  requiresConfirmation: boolean;
+  coverage?: Report["aiCoverage"];
+  reportId?: string;
+  error?: string;
+  createdAt: string;
 }
 
 export interface StoredConversation extends Conversation {
@@ -87,6 +132,16 @@ export interface Report {
   character: string;
   person: string | null;
   mode: "local" | "ai";
+  aiCoverage?: {
+    conversationId: string;
+    totalMessages: number;
+    includedMessages: number;
+    title?: string;
+    firstDate?: string | null;
+    lastDate?: string | null;
+    hasUndatedMessages?: boolean;
+  }[];
+  aiAnalysis?: AnalysisUsage;
   kind: "standard" | "ultimate";
   participants: string[];
   messageCount: number;

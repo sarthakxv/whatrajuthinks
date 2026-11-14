@@ -13,7 +13,7 @@ import {
 } from "react";
 import { BackButton, Icon, LoadingView, PrivacyButton } from "@/components/ui";
 import { api } from "@/lib/client";
-import type { Conversation, Report, Session, Stats } from "@/lib/types";
+import type { Conversation, Report, ReportJobView, Session, Stats } from "@/lib/types";
 
 const paths = [
   "/setup",
@@ -81,6 +81,8 @@ type Draft = {
   person?: string;
   notes?: string;
   lastReportId?: string;
+  requestId?: string;
+  requestKey?: string;
 };
 
 type ImportBody = { filename: string; text?: string; base64?: string };
@@ -452,9 +454,11 @@ export default function SetupWizard({ step }: { step: number }) {
     setBusy(true);
     setGenerating(true);
     setError("");
-    save({ mode });
     try {
-      const { report } = await api<{ report: Report }>("/api/reports", {
+      const requestKey = JSON.stringify([draft.conversation.id, draft.person, draft.language, "Balanced", "", mode]);
+      const requestId = draft.requestKey === requestKey && draft.requestId ? draft.requestId : crypto.randomUUID();
+      save({ mode, requestId, requestKey });
+      const result = await api<{ report?: Report; job?: ReportJobView }>(mode === "ai" ? "/api/report-jobs" : "/api/reports", {
         method: "POST",
         body: {
           conversationId: draft.conversation.id,
@@ -464,10 +468,16 @@ export default function SetupWizard({ step }: { step: number }) {
           contextNotes: "",
           mode,
           character: "Raju",
+          requestId,
         },
       });
-      save({ mode, lastReportId: report.id });
-      router.push(`/r/${report.id}`);
+      if (result.job) {
+        save({ mode, requestId: undefined, requestKey: undefined });
+        router.push(`/generating/${result.job.id}`);
+      } else if (result.report) {
+        save({ mode, requestId: undefined, requestKey: undefined, lastReportId: result.report.id });
+        router.push(`/r/${result.report.id}`);
+      }
     } catch (reason) {
       setError(message(reason));
       setGenerating(false);
@@ -681,6 +691,7 @@ export default function SetupWizard({ step }: { step: number }) {
             )}
           </>
         )}
+        {conversation?.isLargeChat && step >= 3 && <p className="notice">This is a large chat. Raju will read the most recent messages. You’ll see the period covered before he starts.</p>}
         {step === 3 && (
           <>
             <h1>Who does the talking</h1>
@@ -787,7 +798,9 @@ export default function SetupWizard({ step }: { step: number }) {
               {session?.aiConfigured ? (
                 <p className="small muted">
                   Choosing AI sends this chat to the configured
-                  provider. Provider usage charges may apply.
+                  provider. For large chats, Raju reads the most recent messages.
+                  You’ll see the covered period before he starts. Statistics
+                  still cover the full chat.
                 </p>
               ) : (
                 <div className="notice">

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, useApi, useSession, formatDate } from "@/lib/client";
-import type { Conversation, Report } from "@/lib/types";
+import type { Conversation, Report, ReportJobView } from "@/lib/types";
 import {
   Icon,
   BackButton,
@@ -13,6 +13,7 @@ import {
   LoadingView,
   PageError,
 } from "./ui";
+import { coverageNotice } from "@/lib/report-coverage";
 
 function sectionText(section: Report["sections"][number]) {
   const quotes = section.quotes ?? [];
@@ -31,7 +32,7 @@ function sectionText(section: Report["sections"][number]) {
 }
 
 function toText(r: Report) {
-  return `${r.title}\nBy ${r.character} · ${r.mode === "ai" ? "AI report" : "Local analysis"}\n${formatDate(r.createdAt)}\n\n${r.sections.map(sectionText).join("\n\n")}\n\nWhat Raju Thinks · Private report`;
+  return `${r.title}\nBy ${r.character} · ${r.mode === "ai" ? "AI report" : "Local analysis"}\n${formatDate(r.createdAt)}\n\n${coverageNotice(r) ? `${coverageNotice(r)}\n\n` : ""}${r.sections.map(sectionText).join("\n\n")}\n\nWhat Raju Thinks · Private report`;
 }
 
 function QuoteBubble({
@@ -92,6 +93,9 @@ export function ReportView({ id }: { id: string }) {
   const [mode, setMode] = useState<"local" | "ai">("local");
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState("");
+  const generationInFlight = useRef(false);
+  const requestId = useRef<string | null>(null);
+  const requestKey = useRef("");
   if (error) return <PageError message={error} />;
   if (!data) return <LoadingView label="Opening your report." />;
   const r = data.report;
@@ -108,14 +112,18 @@ export function ReportView({ id }: { id: string }) {
     );
   async function followup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!question.trim() || !r.conversationId) return;
+    if (!question.trim() || !r.conversationId || generationInFlight.current) return;
+    generationInFlight.current = true;
     setGenerating(true);
     setGenerationError("");
     try {
       const { conversation } = await api<{ conversation: Conversation }>(
         `/api/conversations/${r.conversationId}`,
       );
-      const { report } = await api<{ report: Report }>("/api/reports", {
+      const key = JSON.stringify([r.conversationId, question.trim(), mode]);
+      if (requestKey.current !== key || !requestId.current) requestId.current = crypto.randomUUID();
+      requestKey.current = key;
+      const result = await api<{ report?: Report; job?: ReportJobView }>(mode === "ai" ? "/api/report-jobs" : "/api/reports", {
         method: "POST",
         body: {
           conversationId: r.conversationId,
@@ -126,16 +134,20 @@ export function ReportView({ id }: { id: string }) {
           question: question.trim(),
           mode,
           character: "Raju",
+          requestId: requestId.current,
         },
       });
       setQuestion("");
-      router.push(`/r/${report.id}`);
+      requestId.current = null;
+      if (result.job) router.push(`/generating/${result.job.id}`);
+      else if (result.report) router.push(`/r/${result.report.id}`);
     } catch (e) {
       setGenerationError(
         e instanceof Error ? e.message : "Could not generate this report.",
       );
     } finally {
       setGenerating(false);
+      generationInFlight.current = false;
     }
   }
   async function copy() {
@@ -192,6 +204,7 @@ export function ReportView({ id }: { id: string }) {
         <div className="privacy-line" style={{ justifyContent: "flex-start" }}>
           <Icon name="shield" /> Private to this workspace <PrivacyButton />
         </div>
+        {coverageNotice(r) && <p className="notice">{coverageNotice(r)}</p>}
         <div className="tabs">
           <Link
             className="tab active"
@@ -287,7 +300,9 @@ export function ReportView({ id }: { id: string }) {
               {mode === "ai" && (
                 <p className="small muted">
                   AI mode sends the source chat and your question to your
-                  configured provider.
+                  configured provider. For large chats, Raju reads the most recent
+                  messages. The report shows the covered period; statistics
+                  still cover the full chat.
                 </p>
               )}
               <ErrorMessage message={generationError} />

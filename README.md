@@ -34,7 +34,9 @@ Copy `.env.example` to `.env.local`, choose the provider and model, and add its 
 
 ```dotenv
 AI_PROVIDER=anthropic
-AI_MODEL=your-enabled-claude-model-id
+AI_MODEL=claude-sonnet-5-5
+AI_MAX_REPORT_COST_USD=1
+AI_TARGET_INPUT_TOKENS=80000
 ANTHROPIC_API_KEY=your-key
 ```
 
@@ -46,11 +48,21 @@ AI_MODEL=your-enabled-openai-model-id
 OPENAI_API_KEY=your-key
 ```
 
-Restart Next.js after changing environment variables. Use a model your provider account supports; there is deliberately no hard-coded model selection. `AI_BASE_URL` optionally overrides the direct provider endpoint.
+Restart Next.js after changing environment variables. New Anthropic reports use reviewed Sonnet 5.5 pricing; an unknown model stops before generation. Legacy Haiku usage remains in historical accounting. Model capacity is retrieved from the Models API and cached for 24 hours. `AI_BASE_URL` optionally overrides the provider endpoint. `AI_TARGET_INPUT_TOKENS` is an economic operating target (4,000–90,000), independent of the model's actual context window.
 
-The server uses [`ai`](https://ai-sdk.dev/docs/introduction), [`@ai-sdk/anthropic`](https://ai-sdk.dev/providers/ai-sdk-providers/anthropic) or [`@ai-sdk/openai`](https://ai-sdk.dev/providers/ai-sdk-providers/openai), and a Zod schema. OpenAI uses its Responses API. The schema validates the title and 5–8 report sections; AI reports are rejected if any quote does not exactly match its source sender and complete text, or if quote references are missing, repeated or out of range. Imported message rows are preserved, including repeated text with identical timestamps.
+The server uses [`ai`](https://ai-sdk.dev/docs/introduction), [`@ai-sdk/anthropic`](https://ai-sdk.dev/providers/ai-sdk-providers/anthropic) or [`@ai-sdk/openai`](https://ai-sdk.dev/providers/ai-sdk-providers/openai), and a Zod schema. OpenAI uses its Responses API. The schema validates the title and 5–8 report sections. Unsupported quotations are removed and quote markers repaired against complete original messages actually supplied to the writer. Imported message rows are preserved, including repeated text with identical timestamps.
 
 Keys stay on the server. Having a key configured does **not** send any messages automatically: select **AI report** and explicitly generate it. Local mode never invokes the SDK. Provider errors are surfaced without silently substituting a fake AI report. Usage is billed by your selected provider.
+
+### Recent-message readings and provider spend
+
+Anthropic reports use one Sonnet 5.5 generation request. Full-history chunk extraction is disabled. The server selects a suffix of complete recent messages that fits the provider token count, model context, 12,000-token output reservation and remaining report budget. The default economic input target is 80,000 tokens; the default total provider-spend ceiling is $1. Prior attempts and uncertain reservations remain on the same job ledger when retrying.
+
+Statistics are calculated from the entire upload. Interpretation and quotations use only the selected messages. Before generating a partial reading, the confirmation shows message counts and the exact covered date range. Reports and copy/download exports retain this coverage snapshot after source expiry. Unknown or partial timestamps are disclosed rather than inferred. Provider prices stay out of user-facing screens.
+
+AI generation runs as an owned persistent job. Model metadata and token-count preflight make no paid generation call. Large/trimmed readings wait for explicit confirmation; one writing call follows. Failed old full-history jobs can be re-prepared for recent messages without resetting spending, and require fresh confirmation. Completed historical reports remain readable. Local statistics/report generation is unchanged.
+
+The existing report-job APIs and local-process worker remain in use. No analysis model or extraction cache is needed for new reports. App credits and checkout remain unimplemented; the internal consumption ledger is available for future billing. The legacy OpenAI path remains separate.
 
 ## Structure
 
@@ -60,6 +72,8 @@ app/                         Next.js routes, layouts and global CSS
 components/                  React setup, library, reports, stats and shared UI
 lib/api.ts                   Validated API actions and workspace ownership
 lib/reports.ts               AI SDK adapter, prompt, schema and local report
+lib/ai-analysis.ts           Recent-message selection, token budgets and cost guards
+lib/report-jobs.ts           Persistent job/confirmation/checkpoint workflow
 lib/parser.mjs               Tested export decoding and deterministic statistics
 lib/store.mjs                SQLite storage and source retention
 lib/types.ts                 Shared TypeScript contracts
@@ -80,13 +94,13 @@ npm run build
 
 Tests cover multiline exports, Unicode, date-order inference, invalid dates, ZIP limits, stats, session isolation, participant cleanup, retention, deletion, SDK routing for both providers, malformed output, failures and explicit local-only operation. Provider tests use mocked HTTP responses; they incur no model charges.
 
-Verified: TypeScript, the production build and all 18 tests pass. Browser checks covered the supplied ZIP, participant cleanup, local generation, saved-report persistence after migration, statistics, and follow-up creation. The mobile homepage fits a 390-pixel viewport without horizontal overflow. React Doctor reported warnings about component size and browser-draft navigation; these remain refactoring opportunities, not a clean scanner result.
+Verified for the recent-message change: TypeScript passes; 45 tests pass and two optional Cloudflare runtime tests are skipped. Isolated browser checks covered the mobile coverage confirmation, the report notice, and downloaded text. React Doctor found no issues in changed files; its online score service was unavailable. No paid live generation was used for this verification.
 
 ## Current limits
 
 - **WhatsApp only** in the prototype. Other messaging platforms, recording OCR, payments, email login/delivery, memberships, gifts and public share links are future modules from the reference spec.
-- No live AI key was supplied, so real generation latency, cost and report quality have not been tested. The SDK protocol and error paths are tested with mocks.
-- Maximum upload: 10 MB. Maximum extracted ZIP contents: 20 MB. AI source payloads over 400,000 characters are rejected without silently dropping messages; larger chats still support local analysis.
+- Generation latency, real provider spend and narrative quality for the new pipeline have not been evaluated with a paid live run. Provider protocol, token-counting, budgeting and failure paths are tested with mocked responses. Older messages are omitted from the narrative and remain included in statistics.
+- Maximum upload: 10 MB. Maximum extracted ZIP contents: 20 MB. Anthropic reads the most recent complete messages within token and spending budgets, with an explicit period/coverage notice. Statistics cover the full upload. Writing allows 12,000 output tokens and a three-minute timeout.
 - Numeric export dates are inferred across the whole file. If every date is ambiguous, day/month is used. Timestamps retain the export’s clock as a UTC-shaped value; they do not prove the sender’s time zone.
 - SQLite data is local and is **not encrypted at rest**. A cookie identifies the workspace; it is not a production authentication system. The API accepts localhost requests only. Clearing cookies creates a different workspace.
 - Source chats expire after 48 hours without a report, or seven days after the latest generated report. Cleanup runs on the next API request. Report snapshots remain until deleted. SQLite deletion is logical deletion, not a forensic secure erase.
@@ -101,7 +115,9 @@ The product spec distinguishes public claims, observed browser behavior, static 
 
 The hosted app uses OpenNext for Next.js pages and a SQLite-backed Durable Object
 per browser workspace for the API. Local development still uses `data/app.sqlite`.
-Long exports are
+Anthropic AI readings run from Durable Object alarms; progress, provider accounting, and
+checkpoints survive the HTTP response. An interrupted paid call requires explicit
+resume instead of being automatically charged again. Long exports and plans are
 chunked below Cloudflare's SQL cell size limit. Expiry alarms remove source text
 and its chunks even when the browser is closed.
 
@@ -139,5 +155,7 @@ cookie-owned workspace without email login or cross-device recovery. Browser
 sign-out removes access; deletion removes the workspace's stored chats and reports.
 
 `test/cloudflare.test.mjs` exercises the real local Worker runtime when
-`WORKER_TEST_URL=http://localhost:8787` is set. It uses a synthetic export to check
-large Unicode payloads, workspace isolation, factual reports, and deletion.
+`WORKER_TEST_URL=http://localhost:8787` is set. Its optional AI test additionally
+requires `WORKER_TEST_MOCK_AI=1` and a preview configured with a fake key and
+`AI_BASE_URL=http://127.0.0.1:8790/v1`; it starts a local mock provider and never
+calls a real AI service.

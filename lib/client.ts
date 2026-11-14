@@ -29,11 +29,14 @@ export async function api<T>(
   return data as T;
 }
 
-export function useApi<T>(path: string) {
+export function useApi<T>(path: string, refreshInterval = 0, recoverErrors = false) {
   const { data, error, mutate } = useSWR<T, Error>(path, api<T>, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: recoverErrors,
     revalidateOnMount: true,
-    shouldRetryOnError: false,
+    shouldRetryOnError: recoverErrors,
+    errorRetryCount: 2,
+    errorRetryInterval: 2000,
+    refreshInterval,
   });
   return { data, error: error?.message, refresh: mutate };
 }

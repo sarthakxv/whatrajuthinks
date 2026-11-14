@@ -70,7 +70,7 @@ export function collectPayloads(storage: DurableObjectStorage) {
     });
   }
   storage.transactionSync(() => {
-    for (const { data } of sql.exec<{ data: string }>("SELECT metadata AS data FROM conversations UNION ALL SELECT messages FROM conversations WHERE messages IS NOT NULL UNION ALL SELECT data FROM reports")) visit(data);
+    for (const { data } of sql.exec<{ data: string }>("SELECT metadata AS data FROM conversations UNION ALL SELECT messages FROM conversations WHERE messages IS NOT NULL UNION ALL SELECT data FROM reports UNION ALL SELECT data FROM report_jobs UNION ALL SELECT data FROM analysis_cache")) visit(data);
     for (const { id } of sql.exec<{ id: string }>("SELECT DISTINCT id FROM payload_chunks").toArray())
       if (!live.has(id)) {
         sql.exec("DELETE FROM payload_chunks WHERE id=?", id);
