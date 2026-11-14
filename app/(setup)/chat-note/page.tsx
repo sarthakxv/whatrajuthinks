@@ -1,7 +1,5 @@
-import SetupWizard from "@/components/setup-wizard";
-
-export const metadata = { title: "Step 5" };
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <SetupWizard step={5} />;
+  redirect("/chat-person");
 }

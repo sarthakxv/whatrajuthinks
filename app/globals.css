@@ -2363,3 +2363,144 @@ dialog .modal-actions .btn {
     font-size: 20px;
   }
 }
+
+/* Participant setup keeps the same color for each person across all three screens. */
+.participant-setup .wizard-actions .btn-primary {
+  flex: none;
+  min-width: 180px;
+}
+.talking-list {
+  display: grid;
+  gap: 28px;
+  margin: 36px auto;
+  text-align: left;
+}
+.talking-label, .talking-name, .talking-count {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.talking-label {
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+.talking-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.participant-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border-radius: 50%;
+  background: var(--participant-color);
+}
+.talking-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  gap: 8px;
+}
+.talking-count > span:last-child { margin-left: 12px; }
+.talking-count svg { width: 16px; height: 16px; }
+.talking-track {
+  height: 14px;
+  background: #f5f5f5;
+  border-radius: 30px;
+}
+.talking-track > span {
+  position: relative;
+  display: block;
+  height: 100%;
+  min-width: 16px;
+  border-radius: inherit;
+  background: var(--participant-color);
+}
+.talking-track > span::after {
+  content: "";
+  position: absolute;
+  inset: 3px 8px auto;
+  height: 4px;
+  border-radius: 12px;
+  background: #ffffff66;
+}
+.names-fields { border: 0; padding: 0; margin: 0 auto; min-width: 0; max-width: 440px; }
+.names-fields .field { text-align: left; }
+.name-preview {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: 28px 0 24px;
+}
+.setup-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--participant-color);
+  border: 3px solid color-mix(in srgb, var(--participant-color), #000 25%);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--participant-color), #000 25%);
+  color: white;
+  font-weight: 750;
+  font-size: 22px;
+}
+.name-preview .setup-avatar { width: 80px; height: 80px; font-size: 36px; }
+.name-preview p { overflow-wrap: anywhere; text-align: center; }
+.participant-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 32px 0 24px;
+}
+.participant-choice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 2px solid #e5e5e5;
+  box-shadow: 0 4px 0 #e5e5e5;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.participant-choice > span:last-child { min-width: 0; }
+.participant-choice:hover, .participant-choice.selected {
+  border-color: var(--participant-color);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--participant-color), #000 20%);
+}
+@media (max-width: 600px) {
+  .participant-choices { grid-template-columns: 1fr; }
+  .participant-choice { padding: 16px; }
+  .talking-label { gap: 8px; }
+  .talking-name { gap: 8px; }
+  .talking-count { gap: 4px; }
+  .talking-count > span:last-child { margin-left: 4px; }
+}
+
+/* Center app containers while preserving left-aligned content within them. */
+.account-bar {
+  max-width: 899px;
+  margin-inline: auto;
+}
+.convo-grid {
+  margin-inline: auto;
+}
+.account-home > .notice {
+  width: min(819px, calc(100% - 80px));
+  margin: 20px auto 0;
+}
+.account-settings-body { margin-inline: auto; }
+.account-settings-bar {
+  width: min(960px, 100%);
+  margin-inline: auto;
+}
+@media (max-width: 720px) {
+  .account-home > .notice { width: calc(100% - 40px); }
+}

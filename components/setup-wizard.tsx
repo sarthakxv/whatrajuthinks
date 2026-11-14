@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -10,6 +9,7 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 import { Icon, LoadingView, PrivacyButton } from "@/components/ui";
 import { api } from "@/lib/client";
@@ -19,8 +19,8 @@ const paths = [
   "/setup",
   "/upload",
   "/chat-context",
-  "/chat-language",
-  "/chat-note",
+  "/chat-names",
+  "/chat-person",
   "/report-launch",
 ];
 const contexts = [
@@ -61,22 +61,11 @@ const contexts = [
     description: "Roommates, neighbours, anything else…",
   },
 ];
-const languages = [
-  "English",
-  "Hindi",
-  "Hinglish",
-  "French",
-  "Spanish",
-  "Portuguese",
-  "German",
-  "Italian",
-  "Arabic",
-  "Hebrew",
-  "Turkish",
-  "Japanese",
-  "Korean",
-];
-const tones = ["Balanced", "Gentle", "No filter"];
+const participantColors = ["#ff91e7", "#ffc800", "#82c8f5", "#a8d78b", "#c6a4f4", "#ffa583"];
+function participantStyle(index: number): CSSProperties {
+  return { "--participant-color": participantColors[index % participantColors.length] } as CSSProperties;
+}
+
 const maxUpload = 10 * 1024 * 1024;
 const draftKey = "raju-draft";
 let memoryDraft: Draft | null = null;
@@ -116,10 +105,10 @@ function readDraft(): Draft {
       ...saved,
       context: typeof saved.context === "string" ? saved.context : "",
       language: typeof saved.language === "string" ? saved.language : "English",
-      tone: typeof saved.tone === "string" ? saved.tone : "Balanced",
+      tone: "Balanced",
       mode: saved.mode === "ai" ? "ai" : "local",
       person: typeof saved.person === "string" ? saved.person : undefined,
-      notes: typeof saved.notes === "string" ? saved.notes : "",
+      notes: "",
       conversation:
         conversation &&
         typeof conversation.id === "string" &&
@@ -230,118 +219,52 @@ function Modal({
   );
 }
 
-function PeopleForm({
-  draft,
-  busy,
-  error,
-  onSave,
-}: {
+function PeopleForm({ draft, busy, error, onSave }: {
   draft: Draft;
   busy: boolean;
   error: string;
-  onSave: (
-    aliases: Record<string, string>,
-    title: string,
-    person: string,
-  ) => void;
+  onSave: (aliases: Record<string, string>) => void;
 }) {
   const conversation = draft.conversation!;
   const [names, setNames] = useState(() => [...conversation.participants]);
-  const [title, setTitle] = useState(conversation.title);
-  const [selected, setSelected] = useState(() =>
-    conversation.participants.indexOf(
-      draft.person || conversation.person || "",
-    ),
-  );
+  const [index, setIndex] = useState(0);
   const [validationError, setValidationError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { input.current?.focus(); }, [index]);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanNames = names.map((name) => name.trim());
-    if (!title.trim() || cleanNames.some((name) => !name))
-      return setValidationError(
-        "Give the conversation and each person a name.",
-      );
+    if (!cleanNames[index]) return setValidationError("Give this person a first name.");
+    if (index < names.length - 1) {
+      setValidationError("");
+      setIndex(index + 1);
+      return;
+    }
     if (new Set(cleanNames).size < 2)
-      return setValidationError(
-        "Keep at least two different people in this chat.",
-      );
-    if (selected < 0) return setValidationError("Select which person is you.");
+      return setValidationError("Keep at least two different people in this chat.");
     setValidationError("");
-    onSave(
-      Object.fromEntries(
-        conversation.participants.map((name, index) => [
-          name,
-          cleanNames[index],
-        ]),
-      ),
-      title.trim(),
-      cleanNames[selected],
-    );
+    onSave(Object.fromEntries(conversation.participants.map((name, i) => [name, cleanNames[i]])));
   }
+
   return (
     <>
-      <span className="eyebrow">
-        {conversation.messageCount.toLocaleString()} messages ·{" "}
-        {conversation.participants.length} people
-      </span>
-      <h1>Let’s put names to the messages.</h1>
-      <p className="lead">Use first names, then select which person is you.</p>
+      <h1>Clean up the names</h1>
+      <p className="lead">Replace nicknames and emojis with simple first names, so Raju knows who’s who.</p>
       <form onSubmit={submit} aria-busy={busy}>
-        <fieldset
-          disabled={busy}
-          style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
-        >
-          <div className="field">
-            <label htmlFor="chat-title">Name this conversation</label>
-            <input
-              id="chat-title"
-              maxLength={200}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              required
-            />
+        <fieldset disabled={busy} className="names-fields">
+          <div className="name-preview" style={participantStyle(index)}>
+            <span className="setup-avatar" aria-hidden="true">{Array.from(names[index])[0]?.toUpperCase()}</span>
+            <p className="small muted">From your export: {conversation.participants[index]}</p>
           </div>
-          {conversation.participants.map((name, index) => (
-            <div className="person-row" key={name}>
-              <span className="person-avatar" aria-hidden="true">
-                {Array.from(name)[0]?.toUpperCase()}
-              </span>
-              <div className="person-info">
-                <input
-                  className="name-input"
-                  aria-label={`Name for ${name}`}
-                  value={names[index]}
-                  maxLength={100}
-                  required
-                  onChange={(event) =>
-                    setNames((previous) =>
-                      previous.map((value, i) =>
-                        i === index ? event.target.value : value,
-                      ),
-                    )
-                  }
-                />
-                <small>From your export: {name}</small>
-              </div>
-              <label>
-                <input
-                  type="radio"
-                  name="person"
-                  checked={selected === index}
-                  value={index}
-                  onChange={() => setSelected(index)}
-                  required
-                />
-                That’s me
-              </label>
-            </div>
-          ))}
-          <div className="notice">
-            One person showing up twice? Give both profiles exactly the same
-            name to merge them. Keep at least two different people.
+          <div className="field">
+            <label htmlFor="first-name">First name</label>
+            <input ref={input} id="first-name" value={names[index]} maxLength={100} required
+              onChange={(event) => setNames(names.map((name, i) => i === index ? event.target.value : name))} />
           </div>
           <ErrorNotice>{validationError || error}</ErrorNotice>
-          <ContinueButton busy={busy}>Looks right</ContinueButton>
+          <ContinueButton busy={busy}>Next ({index + 1}/{names.length})</ContinueButton>
+          {index > 0 && <button type="button" className="btn btn-quiet" onClick={() => { setValidationError(""); setIndex(index - 1); }}>Previous person</button>}
         </fieldset>
       </form>
     </>
@@ -491,9 +414,8 @@ export default function SetupWizard({ step }: { step: number }) {
   }
 
   async function savePeople(
-    aliases: Record<string, string>,
-    title: string,
-    person: string,
+    aliases?: Record<string, string>,
+    person?: string,
   ) {
     if (!draft?.conversation || busyRef.current) return;
     busyRef.current = true;
@@ -502,9 +424,9 @@ export default function SetupWizard({ step }: { step: number }) {
     try {
       const result = await api<{ conversation: Conversation }>(
         `/api/conversations/${draft.conversation.id}`,
-        { method: "PATCH", body: { aliases, title, person } },
+        { method: "PATCH", body: { aliases, person } },
       );
-      next(4, {
+      next(person ? 6 : 5, {
         conversation: result.conversation,
         stats: result.conversation.stats,
         person,
@@ -538,8 +460,8 @@ export default function SetupWizard({ step }: { step: number }) {
           conversationId: draft.conversation.id,
           person: draft.person,
           language: draft.language,
-          tone: draft.tone,
-          contextNotes: draft.notes || "",
+          tone: "Balanced",
+          contextNotes: "",
           mode,
           character: "Raju",
         },
@@ -608,7 +530,7 @@ export default function SetupWizard({ step }: { step: number }) {
         </div>
         <span className="step-count">{step} of 6</span>
       </header>
-      <main className="wizard narrow" id="main">
+      <main className={`wizard narrow${step >= 3 && step <= 5 ? " participant-setup" : ""}`} id="main">
         {step === 1 && (
           <>
             <span className="eyebrow">First, a little context</span>
@@ -765,114 +687,40 @@ export default function SetupWizard({ step }: { step: number }) {
           </>
         )}
         {step === 3 && (
-          <PeopleForm
-            key={conversation!.id + conversation!.participants.join("|")}
-            draft={draft}
-            busy={busy}
-            error={error}
-            onSave={savePeople}
-          />
+          <>
+            <h1>Who does the talking</h1>
+            <div className="talking-list">
+              {(draft.stats || conversation!.stats)?.participants.map((person) => (
+                <div className="talking-person" key={person.name} style={participantStyle(conversation!.participants.indexOf(person.name))}>
+                  <div className="talking-label">
+                    <span className="talking-name"><span className="participant-dot" />{person.name}</span>
+                    <span className="talking-count">{person.messages.toLocaleString()} <Icon name="bubble" /> <span>{Math.round(person.percentage)}%</span></span>
+                  </div>
+                  <div className="talking-track" role="meter" aria-label={`${person.name}’s share of messages`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={person.percentage}>
+                    <span style={{ width: `${person.messages / Math.max(...(draft.stats || conversation!.stats)!.participants.map((p) => p.messages)) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <form onSubmit={(event) => { event.preventDefault(); next(4); }}><ContinueButton /></form>
+          </>
         )}
         {step === 4 && (
-          <>
-            <span className="eyebrow">Make it yours</span>
-            <h1>How should Raju write it?</h1>
-            <p className="lead">
-              Your report can be in a different language from your chat.
-            </p>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                next(5);
-              }}
-            >
-              <div className="field">
-                <label htmlFor="language">Report language</label>
-                <select
-                  id="language"
-                  value={draft.language}
-                  onChange={(event) => save({ language: event.target.value })}
-                >
-                  {languages.map((language) => (
-                    <option key={language}>{language}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="tone">The delivery</label>
-                <select
-                  id="tone"
-                  value={draft.tone}
-                  onChange={(event) => save({ tone: event.target.value })}
-                >
-                  {tones.map((tone) => (
-                    <option key={tone}>{tone}</option>
-                  ))}
-                </select>
-                <small>
-                  Balanced: candid and warm. Gentle: a softer take. No filter:
-                  direct, with a little bite.
-                </small>
-              </div>
-              <div className="author">
-                <Image
-                  src="/assets/raju.svg"
-                  width={42}
-                  height={42}
-                  alt="Raju"
-                />
-                <div>
-                  <strong>Raju</strong>
-                  <p>
-                    A fresh pair of eyes. A soft spot for your inside jokes.
-                  </p>
-                </div>
-              </div>
-              <div className="notice">
-                Language and tone apply to AI reports. Local analysis uses
-                factual English summaries.
-              </div>
-              <ContinueButton />
-            </form>
-          </>
+          <PeopleForm key={conversation!.id + conversation!.participants.join("|")} draft={draft} busy={busy} error={error} onSave={savePeople} />
         )}
         {step === 5 && (
           <>
-            <span className="eyebrow">Between the messages</span>
-            <h1>Anything Raju should know?</h1>
-            <p className="lead">
-              The backstory, an unanswered question, or what you’d like a fresh
-              perspective on. This part is optional.
-            </p>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                next(6, { notes: (draft.notes || "").trim() });
-              }}
-            >
-              <div className="field">
-                <label htmlFor="context-notes">Your context</label>
-                <textarea
-                  id="context-notes"
-                  maxLength={5000}
-                  value={draft.notes || ""}
-                  onChange={(event) => save({ notes: event.target.value })}
-                  placeholder="We’ve been friends since school, but lately something feels different…"
-                />
-                <small>
-                  Up to 5,000 characters. Add only what you’re comfortable
-                  sharing.
-                </small>
-              </div>
-              <ContinueButton />
-              <button
-                type="button"
-                className="btn btn-quiet wide"
-                onClick={() => next(6, { notes: "" })}
-              >
-                Skip for now
-              </button>
-            </form>
+            <h1>Which one is you?</h1>
+            <div className="participant-choices" aria-busy={busy}>
+              {conversation!.participants.map((name, index) => (
+                <button type="button" className={`participant-choice${draft.person === name ? " selected" : ""}`} key={name}
+                  style={participantStyle(index)} disabled={busy} onClick={() => void savePeople(undefined, name)}>
+                  <span className="setup-avatar" aria-hidden="true">{Array.from(name)[0]?.toUpperCase()}</span>
+                  <span>{name}</span>
+                </button>
+              ))}
+            </div>
+            <ErrorNotice>{error}</ErrorNotice>
           </>
         )}
         {step === 6 && (
@@ -891,7 +739,7 @@ export default function SetupWizard({ step }: { step: number }) {
                     ?.title || draft.context,
                 ],
                 ["Messages", conversation!.messageCount.toLocaleString()],
-                ["Language / tone", `${draft.language} / ${draft.tone}`],
+                ["Language / tone", `${draft.language} / Balanced`],
               ].map(([label, value]) => (
                 <div className="summary-row" key={label}>
                   <span>{label}</span>
@@ -943,7 +791,7 @@ export default function SetupWizard({ step }: { step: number }) {
               </div>
               {session?.aiConfigured ? (
                 <p className="small muted">
-                  Choosing AI sends this chat and your notes to the configured
+                  Choosing AI sends this chat to the configured
                   provider. Provider usage charges may apply.
                 </p>
               ) : (
