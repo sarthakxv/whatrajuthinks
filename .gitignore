@@ -1,0 +1,15 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+data/
+.env*
+!.env.example
+.DS_Store
+.cursor/
+research/artifacts/
+research/rea-static.json
+research/rea-focused.json
+research/rea-runtime.json
+research/routes-to-fetch.json
+test-output/
