@@ -107,7 +107,7 @@ export default function HomePage() {
               ],
               [
                 "See it from the outside.",
-                "Get the numbers locally, or choose an AI reading when your provider is connected.",
+                "Get the numbers, or choose an AI reading when a provider is connected.",
               ],
             ].map(([title, body], i) => (
               <article className="how-card" key={title}>
@@ -130,7 +130,7 @@ export default function HomePage() {
             </h2>
             <p>
               No messages sent to the other person. No public report links. Your
-              local workspace, with a clear choice before anything goes to an AI
+              private workspace, with a clear choice before anything goes to an AI
               provider.
             </p>
             <div style={{ marginTop: 20, fontSize: 12 }}>
@@ -142,7 +142,7 @@ export default function HomePage() {
               <Icon name="lock" /> No account or card required
             </div>
             <div className="privacy-row">
-              <Icon name="shield" /> Local analysis stays on this computer
+              <Icon name="shield" /> Factual analysis makes no AI request
             </div>
             <div className="privacy-row">
               <Icon name="doc" /> Delete your chats and reports any time

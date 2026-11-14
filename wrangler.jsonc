@@ -1,9 +1,45 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "whatrajuthinks",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-11-14",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
       "service": "whatrajuthinks"
     }
-  ]
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKSPACES",
+        "class_name": "Workspace"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Workspace"
+      ]
+    }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://whatrajuthinks.skywalker-564.workers.dev"
+  },
+  "keep_vars": true,
+  "preview_urls": false,
+  "observability": {
+    "issues": {
+      "enabled": true
+    }
+  }
 }

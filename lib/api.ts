@@ -1,7 +1,5 @@
-import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseChat, computeStats, decodeImport } from "./parser.mjs";
-import { createStore } from "./store.mjs";
 import type { Store } from "./store.mjs";
 import { aiConfigured, createReport } from "./reports.ts";
 import type {
@@ -120,9 +118,11 @@ function reportOptions(
 export function createApi({
   store,
   busy = new Set<string>(),
+  origin,
 }: {
   store: Store;
   busy?: Set<string>;
+  origin?: string;
 }): (request: Request) => Promise<Response> {
   return async function handle(request: Request): Promise<Response> {
     const headers = new Headers({
@@ -137,10 +137,10 @@ export function createApi({
     try {
       const url = new URL(request.url);
       const host = request.headers.get("host") ?? url.host;
-      if (!/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host))
+      if (origin ? url.origin !== origin || host !== new URL(origin).host : !/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host))
         fail(403, "This app only accepts localhost requests.");
-      const origin = request.headers.get("origin");
-      if (origin && origin !== `http://${host}` && origin !== `https://${host}`)
+      const requestOrigin = request.headers.get("origin");
+      if (requestOrigin && requestOrigin !== (origin ?? url.origin))
         fail(403, "Cross-origin requests are not allowed.");
       const path = url.pathname;
       let session = request.headers
@@ -150,7 +150,7 @@ export function createApi({
         session = store.newSession();
         headers.set(
           "Set-Cookie",
-          `raju_session=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`,
+          `raju_session=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${url.protocol === "https:" ? "; Secure" : ""}`,
         );
       }
       // The store validated the existing session or created one above.
@@ -164,7 +164,7 @@ export function createApi({
       });
       if (path === "/api/session" && request.method === "GET") {
         return json(200, {
-          mode: "local",
+          mode: origin ? "hosted" : "local",
           aiConfigured: aiConfigured(),
           characters: ["Raju", "Meera", "Kabir"],
           paymentsEnabled: false,
@@ -401,25 +401,4 @@ export function createApi({
       });
     }
   };
-}
-
-// Next.js development reloads route modules; keep one SQLite connection and generation lock per process.
-const globalState = globalThis as typeof globalThis & {
-  rajuStore?: Store;
-  rajuReportLocks?: Set<string>;
-};
-let apiHandler: ReturnType<typeof createApi> | undefined;
-
-export async function handleApi(request: Request): Promise<Response> {
-  if (!apiHandler) {
-    globalState.rajuStore ??= createStore(
-      process.env.DATA_PATH ?? resolve(process.cwd(), "data/app.sqlite"),
-    );
-    globalState.rajuReportLocks ??= new Set<string>();
-    apiHandler = createApi({
-      store: globalState.rajuStore,
-      busy: globalState.rajuReportLocks,
-    });
-  }
-  return apiHandler(request);
 }

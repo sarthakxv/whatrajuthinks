@@ -7,7 +7,7 @@ import type {
 
 export interface Store {
   session(id: string | undefined): string | undefined;
-  newSession(): string;
+  newSession(id?: string): string;
   purge(now?: string): void;
   addConversation(
     session: string,

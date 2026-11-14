@@ -96,3 +96,48 @@ The supplied private export was tested locally (2,584 messages, two participants
 ## Investigation boundary
 
 The product spec distinguishes public claims, observed browser behavior, static shipped-code evidence and unknowns. REA MCP/CLI static analysis and browser capture attempts failed with tool I/O/execution errors; no successful REA Evidence IDs were produced. The report therefore uses its own explicitly labeled public/UI/static evidence ledger. The original paid report remainder was not purchased or inspected.
+
+## Cloudflare deployment
+
+The hosted app uses OpenNext for Next.js pages and a SQLite-backed Durable Object
+per browser workspace for the API. Local development still uses `data/app.sqlite`.
+Long exports are
+chunked below Cloudflare's SQL cell size limit. Expiry alarms remove source text
+and its chunks even when the browser is closed.
+
+```bash
+npm ci
+npm run check
+npm run check:cloudflare
+npm test
+npm run preview:cloudflare
+npm run deploy:cloudflare
+```
+
+`npm run build` generates both the Next.js output and `.open-next/worker.js`
+with `.open-next/assets`. OpenNext invokes `build:next` internally to avoid
+recursion. Preview and deployment scripts build before starting Wrangler. The
+existing Cloudflare Build settings (`npm run build`, then `npx wrangler deploy`)
+therefore also work from a clean checkout. Commit `package-lock.json`,
+`wrangler.jsonc`, `open-next.config.ts`, and the application changes together.
+Do not commit `.env`, `.dev.vars`, `.open-next`, or `.wrangler`.
+
+The Worker name and self-reference are both `whatrajuthinks`. Set `APP_ORIGIN` in
+`wrangler.jsonc` to the exact public HTTPS origin when adding a custom domain.
+Preview overrides this to `http://localhost:8787`. Foreign hosts and origins remain
+blocked. Hosted cookies are HttpOnly, SameSite=Strict, and Secure over HTTPS.
+
+Provider keys belong in Cloudflare Worker secrets (`wrangler secret put
+ANTHROPIC_API_KEY` or `OPENAI_API_KEY`). Configure the other AI settings listed in
+`.env.example` as Worker variables/secrets as appropriate. Existing deployed
+secrets are preserved; local `.env` values are not uploaded by deploying. Without
+a configured provider, factual reports still work without making AI calls.
+
+The first deployment creates the `Workspace` SQLite Durable Object class through
+the `v1` migration. It does not import the local SQLite file. This remains a
+cookie-owned workspace without email login or cross-device recovery. Browser
+sign-out removes access; deletion removes the workspace's stored chats and reports.
+
+`test/cloudflare.test.mjs` exercises the real local Worker runtime when
+`WORKER_TEST_URL=http://localhost:8787` is set. It uses a synthetic export to check
+large Unicode payloads, workspace isolation, factual reports, and deletion.

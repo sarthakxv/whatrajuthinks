@@ -701,7 +701,7 @@ export default function SetupWizard({ step }: { step: number }) {
               </label>
             )}
             <div className="privacy-line">
-              <Icon name="shield" /> Your data stays on this computer{" "}
+              <Icon name="shield" /> Your workspace is private to this browser{" "}
               <PrivacyButton />
             </div>
             {modal !== "paste" && <ErrorNotice>{error}</ErrorNotice>}
@@ -916,7 +916,7 @@ export default function SetupWizard({ step }: { step: number }) {
                     Local analysis
                   </span>
                   <small>
-                    Real counts, reply gaps and quotes. Stays on this computer.
+                    Real counts, reply gaps and quotes. No AI provider request.
                     Free.
                   </small>
                 </label>

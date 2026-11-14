@@ -99,7 +99,7 @@ export function Settings() {
         >
           <p>
             {confirm === "signout"
-              ? "This browser will open a new empty workspace. Chats already stored here stay on this computer, but this browser will not open them again."
+              ? "This browser will open a new empty workspace. Saved chats stay on the server, but this browser will not open them again."
               : "This permanently deletes every chat and report in this browser’s workspace. This cannot be undone."}
           </p>
           <ErrorMessage message={error} />

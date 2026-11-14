@@ -13,3 +13,7 @@ research/rea-focused.json
 research/rea-runtime.json
 research/routes-to-fetch.json
 test-output/
+
+.open-next/
+.wrangler/
+.dev.vars*

@@ -31,7 +31,7 @@ const faqs = [
   ],
   [
     "Why can’t I sign in from another device?",
-    "This is a local prototype. A browser cookie identifies your workspace on this server. Email sign-in, cloud sync, payments and other messaging apps are outside the first build.",
+    "A browser cookie identifies your workspace on this server. Your workspace is private to this browser. Email sign-in, cross-device access, payments and other messaging apps are outside this build.",
   ],
   [
     "How accurate is a report?",

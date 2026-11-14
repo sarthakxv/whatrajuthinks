@@ -1,4 +1,4 @@
-import { handleApi } from "@/lib/api";
+import { handleApi } from "@/lib/local-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

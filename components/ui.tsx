@@ -138,7 +138,7 @@ export function Footer() {
         </div>
         <div className="footer-bottom">
           <span>© {new Date().getFullYear()} What Raju Thinks</span>
-          <span>Independent local prototype · WhatsApp edition</span>
+          <span>Independent prototype · WhatsApp edition</span>
         </div>
       </div>
     </footer>
@@ -225,7 +225,7 @@ export function PrivacyButton({
       {open && (
         <Modal title="Your chat, your business." onClose={() => setOpen(false)}>
           <p>
-            Your export is processed by the server running on this computer.
+            Your export is processed by the server hosting this app.
             Local analysis makes no request to an AI provider.
           </p>
           <p>
@@ -239,8 +239,8 @@ export function PrivacyButton({
             delete them.
           </p>
           <p>
-            Data is stored in a local SQLite file, which is not encrypted by
-            this prototype. Delete chats and reports from your workspace
+            When hosted, data is stored in a private Cloudflare workspace.
+            When run locally, it is stored in an unencrypted SQLite file. Delete chats and reports from your workspace
             whenever you like.
           </p>
         </Modal>
@@ -272,7 +272,7 @@ export function LoadingView({
       <p>
         {ai
           ? "Connecting the dots, finding the callbacks, keeping the receipts."
-          : "Opening your local workspace."}
+          : "Opening your workspace."}
       </p>
       <div className="progress">
         <span />

@@ -35,7 +35,7 @@ export interface Stats {
 }
 
 export interface Session {
-  mode: "local";
+  mode: "local" | "hosted";
   aiConfigured: boolean;
   characters: string[];
   paymentsEnabled: boolean;
