@@ -30,6 +30,20 @@ function countLabel(count: number) {
 
 export function Workspace() {
   const pending = useApi<{ jobs: ReportJobView[] }>("/api/report-jobs", 5000);
+  const [removing, setRemoving] = useState<string[]>([]);
+  const [processError, setProcessError] = useState("");
+  async function removeProcess(id: string) {
+    setRemoving(current => [...current, id]);
+    setProcessError("");
+    try {
+      await api(`/api/report-jobs/${id}`, { method: "DELETE" });
+      await pending.refresh(current => current ? { jobs: current.jobs.filter(job => job.id !== id) } : current);
+    } catch (error) {
+      setProcessError(error instanceof Error ? error.message : "Could not remove this process.");
+    } finally {
+      setRemoving(current => current.filter(value => value !== id));
+    }
+  }
   const reports = useApi<{ reports: ReportSummary[] }>("/api/reports", 0, true);
   const chats = useApi<{ conversations: Conversation[] }>("/api/conversations", 0, true);
   if ((reports.error || chats.error) && (!reports.data || !chats.data))
@@ -80,11 +94,34 @@ export function Workspace() {
           <Icon name="gear" />
         </Link>
       </header>
-      {pending.data?.jobs.filter(job => job.status !== "completed").map(job => (
-        <div className="notice" key={job.id}>
-          <Link href={`/generating/${job.id}`}>{job.stage} · Open your reading</Link>
-        </div>
-      ))}
+      {!!pending.data?.jobs.some(job => job.status !== "completed") && (
+        <section className="background-processes" aria-labelledby="background-processes-title">
+          <h2 id="background-processes-title">Background processes</h2>
+          <p className="background-processes-hint">Readings run in the background. You can leave this page.</p>
+          <ul className="background-process-list">
+            {pending.data.jobs.filter(job => job.status !== "completed").map(job => {
+              const running = ["planning", "queued", "running"].includes(job.status);
+              const waiting = job.status === "awaiting_confirmation";
+              const status = running ? "Running in background" : waiting ? "Waiting for you" : job.status === "failed" ? "Failed · Not running" : "Interrupted · Not running";
+              return (
+                <li className="background-process" key={job.id}>
+                  <div className="background-process-copy">
+                    <span className="background-process-status">{status}</span>
+                    <strong>{job.stage}</strong>
+                    {job.error && <p>{job.error}</p>}
+                  </div>
+                  <div className="background-process-actions">
+                    <Link className="text-link" href={`/generating/${job.id}`}>{running ? "View progress" : waiting ? "Review reading" : "View details"}</Link>
+                    {!running && <button className="btn" type="button" disabled={removing.includes(job.id)} aria-label={`Remove process: ${job.stage}`} onClick={() => void removeProcess(job.id)}>{removing.includes(job.id) ? "Removing…" : "Remove"}</button>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="background-processes-hint">Removing a stopped process keeps your chat and reports.</p>
+        </section>
+      )}
+      <ErrorMessage message={processError || pending.error || ""} />
       <div className="convo-grid">
         {cards.map((card, index) => (
           <Link

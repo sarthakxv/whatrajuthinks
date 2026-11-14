@@ -282,3 +282,39 @@ test('legacy full-history jobs re-prepare recent messages with fresh consent and
   }finally{f.store.close();}
  });
 });
+
+test('process removal is permanent, owner-scoped, and keeps chats and reports', async () => {
+  const c = conversation(5, 0), f = apiFixture([c]);
+  try {
+    const report = {id: randomUUID(), title: 'Saved report', conversationId: c.id};
+    f.store.addReport(f.session, report, [c.id]);
+    for (const status of ['failed', 'interrupted', 'awaiting_confirmation', 'completed']) {
+      const id = randomUUID();
+      f.store.addJob(f.session, {id, requestId: randomUUID(), conversationIds: [c.id], status, stage: 'Stopped', calls: []});
+      assert.equal((await f.request(`/api/report-jobs/${id}`, 'DELETE', undefined, f.stranger)).status, 404);
+      assert.ok(f.store.job(f.session, id));
+      assert.equal((await f.request(`/api/report-jobs/${id}`, 'DELETE')).status, 200);
+      assert.equal(f.store.job(f.session, id), null);
+      assert.equal((await f.request(`/api/report-jobs/${id}`)).status, 404);
+      assert.equal((await f.request('/api/report-jobs')).data.jobs.some(job => job.id === id), false);
+      assert.ok(f.store.conversation(f.session, c.id).messages);
+      assert.ok(f.store.report(f.session, report.id));
+    }
+  } finally { f.store.close(); }
+});
+
+test('process removal rejects live workers and recovers expired ones before removal', async () => {
+  const c = conversation(5, 0), f = apiFixture([c]);
+  try {
+    for (const status of ['planning', 'queued', 'running']) {
+      const id = randomUUID();
+      f.store.addJob(f.session, {id, requestId: randomUUID(), conversationIds: [c.id], status, stage: 'Working', calls: [], leaseUntil: Date.now() + 60000});
+      assert.equal((await f.request(`/api/report-jobs/${id}`, 'DELETE')).status, 409);
+      assert.ok(f.store.job(f.session, id));
+      f.store.updateJob(f.session, id, job => ({...job, leaseUntil: 0}));
+      assert.equal((await f.request(`/api/report-jobs/${id}`, 'DELETE')).status, 200);
+      assert.equal(f.store.job(f.session, id), null);
+      assert.throws(() => f.store.updateJob(f.session, id, job => ({...job, status: 'failed'})), /no longer available/);
+    }
+  } finally { f.store.close(); }
+});

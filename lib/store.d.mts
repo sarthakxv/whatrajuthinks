@@ -34,6 +34,7 @@ export interface Store {
   job(session: string, id: string): ReportJob | null;
   jobs(session: string): ReportJob[];
   updateJob(session: string, id: string, update: (job: ReportJob) => ReportJob): ReportJob;
+  deleteJob(session: string, id: string): boolean;
   completeJob(session: string, id: string, report: Report): void;
   cachedAnalysis(session: string, key: string): Finding | null;
   cacheAnalysis(session: string, key: string, sourceIds: string[], data: Finding): void;

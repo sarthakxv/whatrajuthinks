@@ -691,7 +691,6 @@ export default function SetupWizard({ step }: { step: number }) {
             )}
           </>
         )}
-        {conversation?.isLargeChat && step >= 3 && <p className="notice">This is a large chat. Raju will read the most recent messages. You’ll see the period covered before he starts.</p>}
         {step === 3 && (
           <>
             <h1>Who does the talking</h1>

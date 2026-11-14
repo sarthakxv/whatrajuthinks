@@ -182,6 +182,10 @@ export function createApi({
       const jobMatch = path.match(/^\/api\/report-jobs\/([a-f0-9-]{36})(?:\/(confirm|resume))?$/);
       if (jobMatch) {
         if (request.method === "GET" && !jobMatch[2]) return json(200, { job: jobs.get(sessionId, jobMatch[1]) });
+        if (request.method === "DELETE" && !jobMatch[2]) {
+          jobs.remove(sessionId, jobMatch[1]);
+          return json(200, { deleted: true });
+        }
         if (request.method === "POST" && jobMatch[2]) return json(200, { job: jobs.act(sessionId, jobMatch[1], jobMatch[2] as "confirm" | "resume") });
         fail(405, "Method not allowed.");
       }

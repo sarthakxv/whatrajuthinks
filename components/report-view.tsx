@@ -13,7 +13,6 @@ import {
   LoadingView,
   PageError,
 } from "./ui";
-import { coverageNotice } from "@/lib/report-coverage";
 
 function sectionText(section: Report["sections"][number]) {
   const quotes = section.quotes ?? [];
@@ -32,7 +31,7 @@ function sectionText(section: Report["sections"][number]) {
 }
 
 function toText(r: Report) {
-  return `${r.title}\nBy ${r.character} · ${r.mode === "ai" ? "AI report" : "Local analysis"}\n${formatDate(r.createdAt)}\n\n${coverageNotice(r) ? `${coverageNotice(r)}\n\n` : ""}${r.sections.map(sectionText).join("\n\n")}\n\nWhat Raju Thinks · Private report`;
+  return `${r.title}\nBy ${r.character} · ${r.mode === "ai" ? "AI report" : "Local analysis"}\n${formatDate(r.createdAt)}\n\n${r.sections.map(sectionText).join("\n\n")}\n\nWhat Raju Thinks · Private report`;
 }
 
 function QuoteBubble({
@@ -204,7 +203,6 @@ export function ReportView({ id }: { id: string }) {
         <div className="privacy-line" style={{ justifyContent: "flex-start" }}>
           <Icon name="shield" /> Private to this workspace <PrivacyButton />
         </div>
-        {coverageNotice(r) && <p className="notice">{coverageNotice(r)}</p>}
         <div className="tabs">
           <Link
             className="tab active"

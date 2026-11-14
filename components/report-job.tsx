@@ -28,6 +28,18 @@ export function ReportJob({ id }: { id: string }) {
     } catch (error) { setActionError(error instanceof Error ? error.message : "Could not continue this reading."); }
     finally { setBusy(false); actionInFlight.current = false; }
   }
+  async function remove() {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setBusy(true); setActionError("");
+    try {
+      await api(`/api/report-jobs/${id}`, { method: "DELETE" });
+      router.replace("/account");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not remove this process.");
+      setBusy(false); actionInFlight.current = false;
+    }
+  }
   if (error) return <PageError message={error} />;
   if (!job) return <LoadingView label="Opening your reading." />;
   const stopped = job.status === "failed" || job.status === "interrupted";
@@ -36,7 +48,7 @@ export function ReportJob({ id }: { id: string }) {
   return (
     <main className="narrow prose" id="main">
       <BackButton href="/account" label="Back to your account" />
-      <span className="eyebrow" style={{ display: "block", marginTop: 24 }}>Your reading</span>
+      <span className="eyebrow" style={{ display: "block", marginTop: 24 }}>Background process</span>
       <h1 className="text-balance">{limitExceeded ? "This chat needs a larger reading." : stopped ? "Your reading has stopped." : job.stage}</h1>
       <div role="status" aria-live="polite">
         {job.status === "planning" && <p>Choosing the recent messages for your reading.</p>}
@@ -44,15 +56,19 @@ export function ReportJob({ id }: { id: string }) {
         {!stopped && <p>This reading runs in the background. You can leave this page and come back from your account. Your progress is saved.</p>}
       </div>
       <ErrorMessage message={actionError || job.error} />
-      {limitExceeded && <>
-        <p>Your uploaded chat is saved. You can choose local analysis from your account, or upload a smaller export.</p>
-        <button className="btn btn-primary" disabled={busy} onClick={() => act("resume")}>{busy ? "Checking…" : "Check this chat again"}</button>{" "}
-        <Link className="btn" href="/account">Open your chats</Link>{" "}
-        <Link className="btn" href="/upload">Upload a smaller chat</Link>
-      </>}
-      {stopped && !limitExceeded && <>
-        <p>Your chat is saved. Try again to prepare a reading of your recent messages.</p>
-        <button className="btn btn-primary" disabled={busy} onClick={() => act("resume")}>{busy ? "Starting…" : "Try again"}</button>
+      {stopped && <>
+        <p>{limitExceeded
+          ? "Your uploaded chat is saved. You can choose local analysis from your account, or upload a smaller export."
+          : "Your chat is saved. Try again to prepare a reading of your recent messages."}</p>
+        <div className="process-actions">
+          <button className="btn btn-primary" type="button" disabled={busy} onClick={() => act("resume")}>{busy ? (limitExceeded ? "Checking…" : "Starting…") : limitExceeded ? "Check this chat again" : "Try again"}</button>
+          <button className="btn" type="button" disabled={busy} onClick={() => void remove()}>{busy ? "Working…" : "Remove process"}</button>
+        </div>
+        <p className="process-actions-note">Removing this stopped process keeps your chat and reports saved.</p>
+        {limitExceeded && <div className="process-actions">
+          <Link className="btn" href="/account">Open your chats</Link>
+          <Link className="btn" href="/upload">Upload a smaller chat</Link>
+        </div>}
       </>}
       {job.status === "awaiting_confirmation" && (
         <Modal title="This is a large chat" onClose={() => router.back()}>

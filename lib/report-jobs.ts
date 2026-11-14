@@ -121,6 +121,13 @@ export function reportJobs(store: Store, enqueue?: (session: string, id: string)
       if (!job) throw new AnalysisError("Report job not found or its source has expired.", 404);
       return jobView(recover(session, job));
     },
+    remove(session: string, id: string) {
+      const job = store.job(session, id);
+      if (!job) throw new AnalysisError("Report job not found or its source has expired.", 404);
+      recover(session, job);
+      if (!store.deleteJob(session, id))
+        throw new AnalysisError("This reading is still running. You can remove it once it stops.", 409);
+    },
     act(session: string, id: string, action: "confirm" | "resume") {
       let job = store.job(session, id);
       if (!job) throw new AnalysisError("Report job not found or its source has expired.", 404);
