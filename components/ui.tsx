@@ -31,6 +31,12 @@ export function Icon({
     close: <path d="m6 6 12 12M6 18 18 6" />,
     trash: <path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" />,
     download: <path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4" />,
+    copy: (
+      <>
+        <rect x="9" y="9" width="12" height="12" rx="2" />
+        <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+      </>
+    ),
     share: <path d="M12 15V3m-4 4 4-4 4 4M5 11v10h14V11" />,
     chart: <path d="M4 3v18h17M8 16v-5m5 5V6m5 10v-8" />,
     check: <path d="m5 12 4 4L20 5" />,
@@ -77,6 +83,34 @@ export function Icon({
     >
       {paths[name] ?? paths.doc}
     </svg>
+  );
+}
+
+export function BackButton({
+  href,
+  label = "Go back",
+  onClick,
+  disabled,
+}: {
+  href?: string;
+  label?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return href ? (
+    <Link href={href} className="round-back" aria-label={label}>
+      <Icon name="back" />
+    </Link>
+  ) : (
+    <button
+      type="button"
+      className="round-back"
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Icon name="back" />
+    </button>
   );
 }
 
@@ -290,9 +324,7 @@ export function PageError({ message }: { message: string }) {
     <main className="narrow prose" id="main">
       <h1>Let’s take another look.</h1>
       <ErrorMessage message={message} />
-      <Link href="/account" className="btn btn-primary">
-        Back to your reports <Icon name="arrow" />
-      </Link>
+      <BackButton href="/account" label="Back to your reports" />
     </main>
   );
 }

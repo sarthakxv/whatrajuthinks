@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/client";
-import { ErrorMessage, Icon, Modal } from "./ui";
+import { BackButton, ErrorMessage, Icon, Modal } from "./ui";
 
 export function Settings() {
   const [confirm, setConfirm] = useState<"signout" | "delete" | null>(null);
@@ -38,9 +37,7 @@ export function Settings() {
   return (
     <main className="account-settings" id="main">
       <div className="account-settings-bar">
-        <Link href="/account" className="round-back" aria-label="Back">
-          <Icon name="back" />
-        </Link>
+        <BackButton href="/account" label="Back to your account" />
       </div>
       <div className="account-settings-body">
         <h1 className="text-balance">Account settings</h1>

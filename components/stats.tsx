@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useApi, num } from "@/lib/client";
 import type { Conversation, Report, Stats } from "@/lib/types";
-import { Icon, LoadingView, PageError } from "./ui";
+import { BackButton, LoadingView, PageError } from "./ui";
 
 const COLORS = ["#ff90e8", "#ffc900", "#7ee0b5", "#c4b5fd", "#ffb38a"];
 const MINT = { background: "#b9f3e0", color: "#17343d" };
@@ -548,11 +547,7 @@ export function StatsFrame({
     <>
       <div className="stat-bar">
         <div className="stat-bar-inner">
-          <Link className="stat-back" href={backHref} aria-label={backLabel}>
-            <span>
-              <Icon name="back" />
-            </span>
-          </Link>
+          <BackButton href={backHref} label={backLabel} />
           <p>The stats</p>
           <span aria-hidden="true" />
         </div>

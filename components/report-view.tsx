@@ -7,6 +7,7 @@ import { api, useApi, useSession, formatDate } from "@/lib/client";
 import type { Conversation, Report } from "@/lib/types";
 import {
   Icon,
+  BackButton,
   PrivacyButton,
   ErrorMessage,
   LoadingView,
@@ -159,9 +160,7 @@ export function ReportView({ id }: { id: string }) {
   return (
     <main className="narrow" id="main">
       <div className="report-header">
-        <Link className="btn btn-quiet" href="/account">
-          <Icon name="back" /> All your reports
-        </Link>
+        <BackButton href="/account" label="All your reports" />
         <h1 className="serif">{r.title}</h1>
         <div className="author">
           <img src="/assets/raju.svg" alt="Raju" width={42} height={42} />
@@ -176,7 +175,7 @@ export function ReportView({ id }: { id: string }) {
         </div>
         <div className="report-tools">
           <button className="btn" onClick={copy}>
-            <Icon name="share" /> Copy report
+            <Icon name="copy" /> Copy report
           </button>
           <button className="btn" onClick={download}>
             <Icon name="download" /> Save text
@@ -192,11 +191,6 @@ export function ReportView({ id }: { id: string }) {
         )}
         <div className="privacy-line" style={{ justifyContent: "flex-start" }}>
           <Icon name="shield" /> Private to this workspace <PrivacyButton />
-        </div>
-        <div className="notice">
-          {r.mode === "ai"
-            ? "AI interpretation · Read it as a perspective, grounded in the uploaded messages."
-            : "Local analysis · Real numbers and quotes. A full contextual AI reading needs a connected provider."}
         </div>
         <div className="tabs">
           <Link

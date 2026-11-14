@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, formatDate, num, useApi } from "@/lib/client";
 import type { Conversation, ReportSummary } from "@/lib/types";
-import { Icon, LoadingView, Modal, PageError, ErrorMessage } from "./ui";
+import { BackButton, Icon, LoadingView, Modal, PageError, ErrorMessage } from "./ui";
 
 const cardColors = ["#fec901", "#ff91e7", "#7ee1b5", "#c3b6fc"];
 const contextEmoji: Record<string, string> = {
@@ -156,9 +156,7 @@ export function ConversationView({ id }: { id: string }) {
   }
   return (
     <main className="narrow prose" id="main">
-      <Link className="btn btn-quiet" href="/account">
-        <Icon name="back" /> Your account
-      </Link>
+      <BackButton href="/account" label="Back to your account" />
       <span className="eyebrow" style={{ display: "block", marginTop: 25 }}>
         WhatsApp · {num(c.messageCount)} messages
       </span>

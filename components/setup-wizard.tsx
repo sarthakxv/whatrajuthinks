@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type CSSProperties,
 } from "react";
-import { Icon, LoadingView, PrivacyButton } from "@/components/ui";
+import { BackButton, Icon, LoadingView, PrivacyButton } from "@/components/ui";
 import { api } from "@/lib/client";
 import type { Conversation, Report, Session, Stats } from "@/lib/types";
 
@@ -509,15 +509,10 @@ export default function SetupWizard({ step }: { step: number }) {
   return (
     <>
       <header className="wizard-header">
-        <button
-          type="button"
-          className="back"
-          aria-label="Go back"
+        <BackButton
           disabled={busy}
           onClick={() => router.push(step === 1 ? "/" : paths[step - 2])}
-        >
-          <Icon name="back" />
-        </button>
+        />
         <div
           className="progress"
           role="progressbar"
